@@ -1,19 +1,18 @@
 from collections import OrderedDict
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Response
 import os
 import pandas as pd
 from typing import List, Dict, Callable, Tuple
-import datetime
-import string
+import json
+
 
 app = Flask(__name__)
 app.config['JSON_SORT_KEYS'] = False
 
 
-BASEURL = '/usr/local/projects/flask/dataCenter/oerv_obsdata'
+BASEURL = os.getcwd() + '/oerv_obsdata'
 PROPERTIES = ['Project Name', 'Repo Name', 'Success Rate',
               'Total', 'Succeeded', 'Failed', 'Unresolvable']
-
 
 def formatData(rawData):
     res = []
@@ -24,12 +23,11 @@ def formatData(rawData):
         res.append({PROPERTIES[j]: data[i][j] for j in range(len(PROPERTIES))})
     return res
 
-
-def update(date_after: str = '2022-07-24') -> None:  # the short line is required
+def update(date_after: str = '2022-07-26') -> None:  # the short line is required
     '''
-    Function: get lists of commit dates and commit ids
+    get lists of commit dates and commit ids
     '''
-    os.system('git pull')
+    os.system('git pull origin master')
     os.system(
         'git log --pretty=format:"%cd,%H,%s" --date=format:"%Y-%m-%d" --after="{}" > ./commitlog.txt'.format(date_after))
     dates: List[str] = []
@@ -37,20 +35,53 @@ def update(date_after: str = '2022-07-24') -> None:  # the short line is require
     with open('./commitlog.txt') as f:
         for line in f.readlines():
             temp = line[:-1].split(',')
-            if temp[0] not in dates:
+            if temp[0] not in dates and temp[2][:2] == '20':
                 dates.append(temp[0])
                 commitID.append(temp[1])
     df = pd.DataFrame({'date': dates, 'id': commitID})
     df.to_csv('./date_id.csv', index=False)
 
+def getSummary(id: str) -> object:
+    os.system('git checkout {} ./obsData/projectStatistics.txt'.format(id))
+
+    with open('./obsData/projectStatistics.txt') as f:
+        rawData = list(map(lambda line: line[:-1].split('  '), f.readlines()))
+    
+    classData = {line[0] + '  ' + line[1]: {'total': int(line[2]), 'success': int(line[3])} for line in rawData}
+
+    summary = []    
+    classification = {'Core': ['openEuler:Mainline  standard'], 'Extend': ['openEuler:Epol  standard', 'openEuler:Factory  standard', 'Factory:RISC-V  22.09'], 'Third': []}
+    
+    for category in list(classification.keys()):
+        temp = {'category': category, 'total': 0, 'success': 0, 'successRate': 0.0}
+        for project in classification[category]:
+            temp['total'] += classData[project]['total']
+            temp['success'] += classData[project]['success']
+        temp['successRate'] = round(temp['success'] / temp['total'], 2) if temp['total'] else 0.0
+        summary.append(temp)
+            
+    return summary
 
 @app.route('/getProjectStatistics')
-def getProjectStatistics():
-    os.system('git pull')
+def getProjectStatistics():    
+    os.chdir(BASEURL)
     with open('./obsData/projectStatistics.txt') as f:
         rawData = list(map(lambda line: line[:-1].split('  '), f.readlines()))
     return jsonify({'data': formatData(rawData)})
 
+@app.route('/getTrend')
+def getTrend():
+    os.chdir(BASEURL)
+    df = pd.read_csv('./date_id.csv', index_col='date')
+    dates = list(df.index)[::-1]
+    res = []
+    for date in dates:
+        temp = {'date': date, 'data': [], 'total': 0}
+        temp['data'] = getSummary(df.loc[date, 'id'])
+        for summary in temp['data']:
+            temp['total'] += summary['total']
+        res.append(temp)
+    return jsonify({'data': res})
 
 @app.route('/getDiff', methods=['GET', 'POST'])
 def getDiff():
@@ -116,9 +147,12 @@ def getDiff():
 
     os.chdir(BASEURL)
     df = pd.read_csv('./date_id.csv', index_col='date')
-    df.index = df.index.map(str)  # required: change dtype of index
     data = request.values
-    print('this is data', data)
+    
+    dates = list(df.index)
+    date1 = dates[3]
+    date2 = dates[0]
+    id1, id2 = '', ''
     if len(data):
         date1 = data.get('date1')
         date2 = data.get('date2')
@@ -126,7 +160,10 @@ def getDiff():
     else:
         id1, id2 = df.iloc[3, 0], df.iloc[0, 0]
 
-    return jsonify({'data': diff(id1, id2)})
+    
+    options = [{'label': date, 'value': date} for date in dates]
+
+    return jsonify({'data': diff(id1, id2), 'date1': date1, 'date2': date2, 'options': options})
 
 
 if __name__ == '__main__':
