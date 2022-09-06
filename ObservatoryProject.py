@@ -1,13 +1,9 @@
-from collections import OrderedDict
-from flask import Flask, jsonify, request, Response
+from flask import Blueprint, jsonify, request
 import os
 import pandas as pd
 from typing import List, Dict, Callable, Tuple
-import json
 
-
-app = Flask(__name__)
-app.config['JSON_SORT_KEYS'] = False
+appObservatoryProject = Blueprint('appObservatoryProject', __name__)
 
 
 BASEURL = os.getcwd() + '/oerv_obsdata'
@@ -22,24 +18,6 @@ def formatData(rawData):
     for i in range(len(data)):
         res.append({PROPERTIES[j]: data[i][j] for j in range(len(PROPERTIES))})
     return res
-
-def update(date_after: str = '2022-07-26') -> None:  # the short line is required
-    '''
-    get lists of commit dates and commit ids
-    '''
-    os.system('git pull origin master')
-    os.system(
-        'git log --pretty=format:"%cd,%H,%s" --date=format:"%Y-%m-%d" --after="{}" > ./commitlog.txt'.format(date_after))
-    dates: List[str] = []
-    commitID: List[str] = []
-    with open('./commitlog.txt') as f:
-        for line in f.readlines():
-            temp = line[:-1].split(',')
-            if temp[0] not in dates and temp[2][:2] == '20':
-                dates.append(temp[0])
-                commitID.append(temp[1])
-    df = pd.DataFrame({'date': dates, 'id': commitID})
-    df.to_csv('./date_id.csv', index=False)
 
 def getSummary(id: str) -> object:
     os.system('git checkout {} ./obsData/projectStatistics.txt'.format(id))
@@ -62,14 +40,14 @@ def getSummary(id: str) -> object:
             
     return summary
 
-@app.route('/getProjectStatistics')
+@appObservatoryProject.route('/getProjectStatistics')
 def getProjectStatistics():    
-    os.chdir(BASEURL)
-    with open('./obsData/projectStatistics.txt') as f:
+    with open('./oerv_obsdata/obsData/projectStatistics.txt') as f:
         rawData = list(map(lambda line: line[:-1].split('  '), f.readlines()))
+    
     return jsonify({'data': formatData(rawData)})
 
-@app.route('/getTrend')
+@appObservatoryProject.route('/getTrend')
 def getTrend():
     os.chdir(BASEURL)
     df = pd.read_csv('./date_id.csv', index_col='date')
@@ -81,9 +59,10 @@ def getTrend():
         for summary in temp['data']:
             temp['total'] += summary['total']
         res.append(temp)
+    os.chdir(BASEURL + '/..')
     return jsonify({'data': res})
 
-@app.route('/getDiff', methods=['GET', 'POST'])
+@appObservatoryProject.route('/getDiff', methods=['GET', 'POST'])
 def getDiff():
     def compare(a: Dict, b: Dict):
         return a['Project Name'] == b['Project Name'] and a['Repo Name'] == b['Repo Name']
@@ -147,6 +126,7 @@ def getDiff():
 
     os.chdir(BASEURL)
     df = pd.read_csv('./date_id.csv', index_col='date')
+    
     data = request.values
     
     dates = list(df.index)
@@ -160,16 +140,7 @@ def getDiff():
     else:
         id1, id2 = df.iloc[3, 0], df.iloc[0, 0]
 
-    
     options = [{'label': date, 'value': date} for date in dates]
-
-    return jsonify({'data': diff(id1, id2), 'date1': date1, 'date2': date2, 'options': options})
-
-
-if __name__ == '__main__':
-    os.chdir(BASEURL)
-    update()
+    diffRes = diff(id1, id2)
     os.chdir(BASEURL + '/..')
-
-    app.debug = True
-    app.run('0.0.0.0', '8080')
+    return jsonify({'data': diffRes, 'date1': date1, 'date2': date2, 'options': options})
