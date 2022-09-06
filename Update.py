@@ -10,15 +10,15 @@ import re
 
 appUpdate = Blueprint('appUpdate', __name__)
 
-BASEURL = os.getcwd() + '/oerv_obsdata'
+BASEURL = os.getcwd()
 
-@appUpdate.route('/')
-def update(date_after: str = '2022-07-26') -> None:  # the short line is required
+@appUpdate.route('/updateLocal')
+def updateLocal(date_after: str = '2022-07-26') -> None:  # the short line is required
     '''
     - Get lists of commit dates and commit ids
     - Generate a file that contains the names of all related projects
     '''
-    os.chdir(BASEURL)
+    os.chdir(BASEURL + '/oerv_obsdata')
 
     # Part I. Generate a csv file that contains information about dates and commit ids
     os.system('git pull origin master')
@@ -42,5 +42,12 @@ def update(date_after: str = '2022-07-26') -> None:  # the short line is require
             names = set(re.findall(r'^|\n(.*?)  ', raw)[1:])
             f2.write('\n'.join(names))
 
-    os.chdir(BASEURL + '/..')
-    return Response('Success')
+    os.chdir(BASEURL)
+    return Response('Update Local Success')
+
+@appUpdate.route('/updateRepository')
+def updateRepository():
+    os.chdir(BASEURL + '/oerv_script/obs/')
+    os.system('python main.py')
+    os.chdir(BASEURL)
+    return Response('success')

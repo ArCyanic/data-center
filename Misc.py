@@ -17,7 +17,7 @@ def searchPackage():
         return base_url + args
 
     # get html text
-    target = request.values[0]
+    target = request.values.get('packageName', 'gcc')
     account = {'username': 'cyanic', 'password': '123456'}
     response = requests.get(constructURL(target), auth=requests.auth.HTTPBasicAuth(**account))
     text = response.text 
@@ -27,4 +27,5 @@ def searchPackage():
     with open('./oerv_obsdata/projectsNames.txt') as f:
         projectsNames = f.read().split('\n')
     res = list(filter(lambda name: name[0] in projectsNames, raw))
+    res = [{'projectName': item[0], 'packageName': item[1]} for item in res]
     return jsonify({'data': res})

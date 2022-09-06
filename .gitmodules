@@ -1,3 +1,6 @@
 [submodule "oerv_obsdata"]
 	path = oerv_obsdata
 	url = https://gitee.com/phoebe-xi/oerv_obsdata.git
+[submodule "oerv_script"]
+	path = oerv_script
+	url = https://gitee.com/phoebe-xi/oerv_script.git
