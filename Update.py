@@ -47,7 +47,11 @@ def updateLocal(date_after: str = '2022-07-26') -> None:  # the short line is re
 
 @appUpdate.route('/updateRepository')
 def updateRepository():
-    os.chdir(BASEURL + '/oerv_script/obs/')
+    # pull from remote
+    os.chdir(BASEURL + '/oerv_script/oerv_obsdata')
+    os.system('git pull --no-ff')
+
+    os.chdir(BASEURL + '/oerv_script/script/')
     os.system('python main.py')
-    os.chdir(BASEURL)
-    return Response('success')
+    os.chdir(BASEURL)   
+    return Response('Update repository success')
