@@ -36,11 +36,11 @@ def updateLocal(date_after: str = '2022-07-26') -> None:  # the short line is re
     df.to_csv('./date_id.csv', index=False)
 
     # Part II. Generate a txt file that contains information about the names of all related projects
-    with open('./obsData/projectStatistics.txt') as f1:
-        with open('./projectsNames.txt', 'w') as f2:
-            raw = f1.read()
-            names = set(re.findall(r'^|\n(.*?)  ', raw)[1:])
-            f2.write('\n'.join(names))
+    # with open('./obsData/projectStatistics.txt') as f1:
+    #     with open('./projectsNames.txt', 'w') as f2:
+    #         raw = f1.read()
+    #         names = re.findall(r'^|\n(.*?)  (.*?)  ', raw)[1:]
+    #         f2.write('\n'.join(['{},{}'.format(name[0], name[1]) for name in names]))
 
     os.chdir(BASEURL)
     return Response('Update Local Success')
